@@ -2,8 +2,7 @@
 
 Diese Anleitung installiert das Plugin für den aktuellen Benutzer. Das Wetter
 wird über kostenlose, öffentliche Dienste geladen; ein API-Schlüssel ist nicht
-erforderlich. Eine Internetverbindung wird benötigt. Weitere Informationen zu
-Funktionen und Einschränkungen stehen in der [englischen README](README.en.md).
+erforderlich. Eine Internetverbindung wird benötigt.
 
 ## 1. Abhängigkeiten installieren
 
@@ -57,6 +56,16 @@ Führe im Terminal des entpackten Ordners aus:
 Das Skript baut das Plugin, installiert es nur für deinen Benutzer und lädt
 das XFCE-Panel neu. Deine persönlichen Einstellungen werden dabei nicht
 überschrieben.
+
+Ein Klick auf das Wettersymbol öffnet das Wetterfenster. Es bleibt auch dann
+geöffnet, wenn du in ein anderes Fenster klickst. Zum Schließen kannst du die
+Schaltfläche oben rechts oder das X in der Fenstertitelleiste verwenden; ein
+erneuter Klick auf das Wettersymbol schließt es ebenfalls.
+
+Ein Klick auf das Wettersymbol öffnet das Wetterfenster. Es bleibt auch dann
+geöffnet, wenn du in ein anderes Fenster klickst. Zum Schließen kannst du die
+Schaltfläche oben rechts oder das X in der Fenstertitelleiste verwenden; ein
+erneuter Klick auf das Wettersymbol schließt es ebenfalls.
 
 ## 4. Wetter-Widget zum Panel hinzufügen
 
