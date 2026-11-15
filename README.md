@@ -57,11 +57,6 @@ Das Skript baut das Plugin, installiert es nur für deinen Benutzer und lädt
 das XFCE-Panel neu. Deine persönlichen Einstellungen werden dabei nicht
 überschrieben.
 
-Ein Klick auf das Wettersymbol öffnet das Wetterfenster. Es bleibt auch dann
-geöffnet, wenn du in ein anderes Fenster klickst. Zum Schließen kannst du die
-Schaltfläche oben rechts oder das X in der Fenstertitelleiste verwenden; ein
-erneuter Klick auf das Wettersymbol schließt es ebenfalls.
-
 ## 4. Wetter-Widget zum Panel hinzufügen
 
 Rechtsklick auf ein XFCE-Panel → **Panel → Neue Elemente hinzufügen** →

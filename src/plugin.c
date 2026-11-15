@@ -35,7 +35,7 @@ typedef struct
     GtkWidget *panel_box;
     GtkWidget *panel_image;
     GtkWidget *panel_temperature;
-    GtkWidget *weather_window;
+    GtkWidget *popover;
     GtkWidget *place_name;
     GtkWidget *current_image;
     GtkWidget *temperature;
@@ -132,10 +132,6 @@ typedef struct
 static void fetch_weather(WeatherApplet *applet);
 static void update_display(WeatherApplet *applet);
 static void show_preferences(WeatherApplet *applet);
-static void toggle_weather_window(GtkWidget *widget, gpointer user_data);
-static gboolean hide_weather_window(GtkWidget *widget,
-                                    GdkEvent *event,
-                                    gpointer user_data);
 static void save_settings(WeatherApplet *applet);
 static gboolean refresh_timeout(gpointer user_data);
 static void fetch_provider_current(WeatherApplet *applet);
@@ -876,7 +872,7 @@ animate_weather_icon(gpointer user_data)
     gdouble seconds = g_get_monotonic_time() / 1000000.0;
     gdouble opacity;
 
-    if (!applet->animations || !gtk_widget_get_mapped(applet->weather_window))
+    if (!applet->animations || !gtk_widget_get_mapped(applet->popover))
     {
         gtk_widget_set_opacity(applet->current_image, 1.0);
         applet->animation_source = 0;
@@ -890,7 +886,7 @@ animate_weather_icon(gpointer user_data)
 static void
 set_animation_state(WeatherApplet *applet)
 {
-    if (applet->animations && gtk_widget_get_mapped(applet->weather_window))
+    if (applet->animations && gtk_widget_get_mapped(applet->popover))
     {
         if (!applet->animation_source)
             applet->animation_source = g_timeout_add(100,
@@ -921,30 +917,6 @@ popup_unmapped(GtkWidget *widget,
 {
     (void) widget;
     set_animation_state(user_data);
-}
-
-static void
-toggle_weather_window(GtkWidget *widget,
-                      gpointer user_data)
-{
-    WeatherApplet *applet = user_data;
-    (void) widget;
-
-    if (gtk_widget_get_visible(applet->weather_window))
-        gtk_widget_hide(applet->weather_window);
-    else
-        gtk_window_present(GTK_WINDOW(applet->weather_window));
-}
-
-static gboolean
-hide_weather_window(GtkWidget *widget,
-                    GdkEvent *event,
-                    gpointer user_data)
-{
-    (void) event;
-    (void) user_data;
-    gtk_widget_hide(widget);
-    return TRUE;
 }
 
 static void
@@ -2070,30 +2042,31 @@ apply_theme(WeatherApplet *applet)
     }
 
     css = g_strdup_printf(
-        "window#tux-wetter-popup {"
+        "menu#tux-wetter-popup {"
         " background-image: linear-gradient(145deg, %s 0%%, %s 100%%);"
         " border: 1px solid rgba(255,255,255,0.28);"
         " border-radius: 20px; color: #ffffff; padding: 18px; }"
-        "window#tux-wetter-popup label { color: #ffffff; }"
-        "window#tux-wetter-popup .weather-title { font-size: 15pt; font-weight: 600; }"
-        "window#tux-wetter-popup .weather-temperature { font-size: 34pt; font-weight: 300; }"
-        "window#tux-wetter-popup .weather-value { font-weight: 600; }"
-        "window#tux-wetter-popup .weather-small { opacity: 0.82; font-size: 9pt; }"
-        "window#tux-wetter-popup .weather-day { font-weight: 600; }"
-        "window#tux-wetter-popup .weather-separator { background: rgba(255,255,255,0.30); min-height: 1px; }"
-        "window#tux-wetter-popup button { color: #ffffff; background: rgba(255,255,255,0.12);"
+        "menu#tux-wetter-popup > menuitem { padding: 0; margin: 0; background: none; border: 0; }"
+        "menu#tux-wetter-popup label { color: #ffffff; }"
+        "menu#tux-wetter-popup .weather-title { font-size: 15pt; font-weight: 600; }"
+        "menu#tux-wetter-popup .weather-temperature { font-size: 34pt; font-weight: 300; }"
+        "menu#tux-wetter-popup .weather-value { font-weight: 600; }"
+        "menu#tux-wetter-popup .weather-small { opacity: 0.82; font-size: 9pt; }"
+        "menu#tux-wetter-popup .weather-day { font-weight: 600; }"
+        "menu#tux-wetter-popup .weather-separator { background: rgba(255,255,255,0.30); min-height: 1px; }"
+        "menu#tux-wetter-popup button { color: #ffffff; background: rgba(255,255,255,0.12);"
         " border: 1px solid rgba(255,255,255,0.20); border-radius: 8px; }"
-        "window#tux-wetter-popup button:hover { background: rgba(255,255,255,0.24); }"
-        "window#tux-wetter-popup levelbar trough { background: rgba(255,255,255,0.22);"
+        "menu#tux-wetter-popup button:hover { background: rgba(255,255,255,0.24); }"
+        "menu#tux-wetter-popup levelbar trough { background: rgba(255,255,255,0.22);"
         " border-radius: 4px; min-height: 5px; }"
-        "window#tux-wetter-popup levelbar block.filled { background: #ffcf69; border-radius: 4px; }"
-        "window#tux-wetter-popup .weather-warning { color: #ffdf83; font-weight: 600; }"
-        "window#tux-wetter-popup .weather-source { opacity: 0.65; font-size: 8pt; }",
+        "menu#tux-wetter-popup levelbar block.filled { background: #ffcf69; border-radius: 4px; }"
+        "menu#tux-wetter-popup .weather-warning { color: #ffdf83; font-weight: 600; }"
+        "menu#tux-wetter-popup .weather-source { opacity: 0.65; font-size: 8pt; }",
         top, bottom);
     provider = gtk_css_provider_new();
     if (!gtk_css_provider_load_from_data(provider, css, -1, NULL))
         g_warning("%s: could not load widget style", APP_NAME);
-    context = gtk_widget_get_style_context(applet->weather_window);
+    context = gtk_widget_get_style_context(applet->popover);
     gtk_style_context_add_provider(context,
                                    GTK_STYLE_PROVIDER(provider),
                                    GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
@@ -2443,7 +2416,7 @@ add_separator(GtkWidget *box)
 }
 
 static GtkWidget *
-build_weather_window(WeatherApplet *applet)
+build_popover(WeatherApplet *applet)
 {
     gboolean english = use_english(applet);
     GtkWidget *outer = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
@@ -2451,8 +2424,6 @@ build_weather_window(WeatherApplet *applet)
     GtkWidget *previous = gtk_button_new_with_label("‹");
     GtkWidget *next = gtk_button_new_with_label("›");
     GtkWidget *settings = gtk_button_new_with_label("⚙");
-    GtkWidget *close = gtk_button_new_from_icon_name("window-close",
-                                                     GTK_ICON_SIZE_MENU);
     GtkWidget *current = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 14);
     GtkWidget *current_text = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
     GtkWidget *current_top = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
@@ -2460,20 +2431,16 @@ build_weather_window(WeatherApplet *applet)
     GtkWidget *hours_scroller;
     GtkWidget *scroller;
     GtkWidget *settings_icon;
-    GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    GtkWidget *menu = gtk_menu_new();
+    GtkWidget *item = gtk_menu_item_new();
 
-    applet->weather_window = window;
-    gtk_window_set_title(GTK_WINDOW(window), "TuX-Wetter");
-    gtk_window_set_position(GTK_WINDOW(window), GTK_WIN_POS_CENTER);
-    gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
-    gtk_window_set_type_hint(GTK_WINDOW(window), GDK_WINDOW_TYPE_HINT_UTILITY);
-    gtk_widget_set_name(window, "tux-wetter-popup");
-    gtk_widget_set_size_request(window, 500, -1);
-    gtk_container_add(GTK_CONTAINER(window), outer);
-    g_signal_connect(window, "delete-event",
-                     G_CALLBACK(hide_weather_window), applet);
-    g_signal_connect(close, "clicked",
-                     G_CALLBACK(toggle_weather_window), applet);
+    applet->popover = menu;
+    gtk_widget_set_name(menu, "tux-wetter-popup");
+    gtk_menu_set_reserve_toggle_size(GTK_MENU(menu), FALSE);
+    gtk_menu_item_set_reserve_indicator(GTK_MENU_ITEM(item), FALSE);
+    gtk_container_add(GTK_CONTAINER(item), outer);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+    gtk_widget_set_size_request(menu, 500, -1);
 
     g_object_set_data(G_OBJECT(previous), "direction", GINT_TO_POINTER(-1));
     g_object_set_data(G_OBJECT(next), "direction", GINT_TO_POINTER(1));
@@ -2485,7 +2452,6 @@ build_weather_window(WeatherApplet *applet)
     gtk_button_set_relief(GTK_BUTTON(previous), GTK_RELIEF_NONE);
     gtk_button_set_relief(GTK_BUTTON(next), GTK_RELIEF_NONE);
     gtk_button_set_relief(GTK_BUTTON(settings), GTK_RELIEF_NONE);
-    gtk_button_set_relief(GTK_BUTTON(close), GTK_RELIEF_NONE);
     g_signal_connect_swapped(settings, "clicked",
                              G_CALLBACK(show_preferences), applet);
 
@@ -2498,7 +2464,6 @@ build_weather_window(WeatherApplet *applet)
     gtk_box_pack_start(GTK_BOX(header), applet->place_name, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(header), next, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(header), settings, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(header), close, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(outer), header, FALSE, FALSE, 0);
 
     applet->current_image = make_icon("weather-few-clouds", 78);
@@ -2569,8 +2534,7 @@ build_weather_window(WeatherApplet *applet)
     gtk_widget_set_halign(applet->source, GTK_ALIGN_END);
     gtk_box_pack_start(GTK_BOX(outer), applet->source, FALSE, FALSE, 0);
     apply_theme(applet);
-    gtk_widget_show_all(outer);
-    return applet->weather_window;
+    return applet->popover;
 }
 
 static void
@@ -3497,8 +3461,6 @@ applet_free(gpointer data)
 {
     WeatherApplet *applet = data;
 
-    if (applet->weather_window)
-        gtk_widget_destroy(applet->weather_window);
     if (applet->refresh_source)
         g_source_remove(applet->refresh_source);
     g_clear_object(&applet->session);
@@ -3528,8 +3490,7 @@ construct_plugin(XfcePanelPlugin *plugin)
     g_object_set_data_full(G_OBJECT(plugin), "tux-weather-applet",
                            applet, applet_free);
 
-    applet->button = gtk_button_new();
-    gtk_button_set_relief(GTK_BUTTON(applet->button), GTK_RELIEF_NONE);
+    applet->button = gtk_menu_button_new();
     gtk_widget_set_tooltip_text(applet->button, APP_NAME);
     applet->panel_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
     applet->panel_image = gtk_image_new_from_icon_name("weather-few-clouds",
@@ -3551,16 +3512,15 @@ construct_plugin(XfcePanelPlugin *plugin)
                         applet);
     panel_size_changed(plugin, xfce_panel_plugin_get_size(plugin), applet);
 
-    build_weather_window(applet);
-    g_signal_connect(applet->weather_window, "map",
-                     G_CALLBACK(popup_mapped), applet);
-    g_signal_connect(applet->weather_window, "unmap",
-                     G_CALLBACK(popup_unmapped), applet);
-    g_signal_connect(applet->button, "clicked",
-                     G_CALLBACK(toggle_weather_window), applet);
+    build_popover(applet);
+    g_signal_connect(applet->popover, "map", G_CALLBACK(popup_mapped), applet);
+    g_signal_connect(applet->popover, "unmap", G_CALLBACK(popup_unmapped), applet);
+    gtk_menu_button_set_popup(GTK_MENU_BUTTON(applet->button),
+                              applet->popover);
     gtk_widget_show_all(applet->button);
     gtk_widget_hide(applet->warning);
     gtk_widget_hide(applet->status);
+    gtk_widget_show_all(applet->popover);
     apply_display_options(applet);
 
     applet->refresh_source = g_timeout_add_seconds(

@@ -47,8 +47,6 @@ restored from that backup on startup. Updating or reinstalling the plugin does
 not overwrite either settings file.
 
 This is a native GTK/Xfce UI, not a way to load the Plasma `.plasmoid` in Xfce.
-The weather view opens in a regular window and remains open until closed with
-its close button/window control or by clicking the panel icon again.
 Some Plasma behavior is still not ported: MET Norway and DWD do not yet provide
 their own forecast timelines; measured readings from MeteoSchweiz and
 GeoSphere are not included; warnings are not yet filtered by individual hazard
