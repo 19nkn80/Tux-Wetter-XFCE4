@@ -1,57 +1,77 @@
-# TuX-Wetter 0.1 for Xfce 4
+# TuX-Wetter XFCE 0.1 — Schnellinstallation
 
-Native Xfce panel-plugin port of TuX-Wetter. It uses Open-Meteo without an
-account or API key; there are no paid or key-based provider options.
-The presentation follows the ideas in the
-[TuX-Wetter forum thread](https://forum.linuxguides.de/index.php?thread/17421-tux-wetter-v1-3-neue-version-25-10-26/).
+Diese Anleitung installiert das Plugin für den aktuellen Benutzer. Das Wetter
+wird über kostenlose, öffentliche Dienste geladen; ein API-Schlüssel ist nicht
+erforderlich. Eine Internetverbindung wird benötigt. Weitere Informationen zu
+Funktionen und Einschränkungen stehen in der [englischen README](README.en.md).
 
-## Build and install
+## 1. Abhängigkeiten installieren
 
-Dependencies: Xfce Panel 4, GTK 3, libsoup 3, JSON-GLib, a C compiler and
-`pkg-config`. Distribution-specific commands are in [QUICKINSTALL.md](QUICKINSTALL.md).
-`notify-send` is optional and is needed only for desktop warning notifications.
+Öffne ein Terminal und führe **nur den Befehl für deine Distribution** aus.
+Das Passwort ist dein normales Linux-Passwort; bei der Eingabe wird nichts
+angezeigt.
+
+### Arch Linux / Manjaro
 
 ```sh
-make
-sudo make install
+sudo pacman -S --needed base-devel pkgconf xfce4-panel gtk3 libsoup3 json-glib
 ```
 
-Then add **TuX-Wetter** through *Panel → Add New Items*. `make install
-PREFIX="$HOME/.local" LIBDIR="$HOME/.local/lib"` installs under `~/.local`
-without administrator privileges. Restart the panel or log out and back in if
-it is already running.
-For a user-local install and safe panel restart, run `./install-user.sh`.
-It installs only the plugin binary and desktop entry; it never replaces
-personal settings. If no panel process is running, it avoids the failed
-`xfce4-panel -r` D-Bus restart and asks you to restart the XFCE session.
+### Debian / Ubuntu / Linux Mint
 
-The widget provides the panel readout, Open-Meteo forecast and geocoding,
-saved places, a six-hour strip, seven-day forecast, clickable daily temperature
-charts, Celsius/Fahrenheit, refresh interval, color themes, and settings to
-show or hide panel elements and details. MET Norway and DWD/Bright Sky can be
-selected for current conditions; the forecast, UV and sunrise/sunset remain
-from Open-Meteo. Air-quality index and six pollen types come from Open-Meteo;
-moon phase and rise/set come from MET Norway. Public weather warnings are
-queried for Switzerland (MeteoAlarm), Austria (GeoSphere) and Germany (DWD).
-Desktop warning notifications have an adjustable minimum severity. DWD station
-observations are shown when selecting DWD and a nearby reading is recent enough.
+```sh
+sudo apt update
+sudo apt install build-essential pkg-config xfce4-panel libxfce4panel-2.0-dev libgtk-3-dev libsoup-3.0-dev libjson-glib-dev
+```
 
-Automatic IP-based location is optional and disabled by default; enabling it
-sends the public IP-derived location request to GeoJS. Preferences offer
-automatic, German and English display language choices, and an optional gentle
-weather-icon animation while the popup is open. Settings can be exported to or
-imported from an INI backup. Data is stored separately from the plugin in
-`~/.config/tux-wetter-xfce/settings.ini`. Settings are written as they change,
-with the previous file kept as `settings.ini.bak`; a damaged primary file is
-restored from that backup on startup. Updating or reinstalling the plugin does
-not overwrite either settings file.
+### Fedora
 
-This is a native GTK/Xfce UI, not a way to load the Plasma `.plasmoid` in Xfce.
-Some Plasma behavior is still not ported: MET Norway and DWD do not yet provide
-their own forecast timelines; measured readings from MeteoSchweiz and
-GeoSphere are not included; warnings are not yet filtered by individual hazard
-types; the English translation does not cover every settings label; and the
-animated SVG weather scenes and 15-minute rain nowcast are not implemented.
-No paid or API-key-based provider is offered.
+```sh
+sudo dnf install gcc make pkgconf-pkg-config xfce4-panel-devel gtk3-devel libsoup3-devel json-glib-devel
+```
 
-This software is licensed under GPL-3.0-or-later; see [COPYING](COPYING).
+Für optionale Desktop-Benachrichtigungen bei Warnungen zusätzlich installieren:
+
+- Arch / Manjaro: `libnotify`
+- Debian / Ubuntu / Mint: `libnotify-bin`
+- Fedora: `libnotify`
+
+## 2. Paket entpacken
+
+Lade das [Installationspaket xfce4-tux-wetter-0.1.zip](https://github.com/19nkn80/Tux-Wetter-XFCE4/raw/refs/heads/main/xfce4-tux-wetter-0.1.zip)
+herunter. Wechsle im Dateimanager in den Ordner mit der ZIP-Datei, klicke
+sie mit der rechten Maustaste an und wähle **Hier entpacken**. Öffne
+anschließend den entpackten Ordner `xfce4-tux-wetter-0.1` und dort ein Terminal.
+
+Wenn du das Repository bereits geklont hast, kannst du stattdessen direkt
+in dessen Ordner ein Terminal öffnen und mit Schritt 3 fortfahren.
+
+## 3. Installieren
+
+Führe im Terminal des entpackten Ordners aus:
+
+```sh
+./install-user.sh
+```
+
+Das Skript baut das Plugin, installiert es nur für deinen Benutzer und lädt
+das XFCE-Panel neu. Deine persönlichen Einstellungen werden dabei nicht
+überschrieben.
+
+## 4. Wetter-Widget zum Panel hinzufügen
+
+Rechtsklick auf ein XFCE-Panel → **Panel → Neue Elemente hinzufügen** →
+**TuX-Wetter** → **Hinzufügen**. Danach erscheint das Wetter-Widget im Panel.
+
+## Einstellungen und Fehlerhilfe
+
+Die Einstellungen bleiben bei Updates erhalten und liegen unter
+`~/.config/tux-wetter-xfce/`.
+
+Falls die Installation mit einer fehlenden Abhängigkeit abbricht, installiere
+die Pakete aus Schritt 1 für deine Distribution und führe
+`./install-user.sh` erneut aus. Ein Selbsttest ist optional:
+
+```sh
+make test
+```
