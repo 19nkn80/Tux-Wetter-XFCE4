@@ -1,0 +1,8 @@
+[Xfce Panel]
+Type=X-XFCE-PanelPlugin
+Name=TuX-Wetter
+Comment=Weather forecast and alerts on the Xfce panel
+Icon=weather-few-clouds
+X-XFCE-Module=xfce4-tux-wetter
+X-XFCE-Internal=true
+X-XFCE-API=2.0
