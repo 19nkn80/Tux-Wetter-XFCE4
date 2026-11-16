@@ -1,4 +1,4 @@
-# TuX-Wetter XFCE 0.1 — Schnellinstallation
+# TuX-Wetter XFCE 0.2 — Schnellinstallation
 
 Diese Anleitung installiert das Plugin für den aktuellen Benutzer. Das Wetter
 wird über kostenlose, öffentliche Dienste geladen; ein API-Schlüssel ist nicht
@@ -37,10 +37,10 @@ Für optionale Desktop-Benachrichtigungen bei Warnungen zusätzlich installieren
 
 ## 2. Paket entpacken
 
-Lade das [Installationspaket xfce4-tux-wetter-0.1.zip](https://github.com/19nkn80/Tux-Wetter-XFCE4/raw/refs/heads/main/xfce4-tux-wetter-0.1.zip)
+Lade das [Installationspaket xfce4-tux-wetter-0.2.zip](https://github.com/19nkn80/Tux-Wetter-XFCE4/raw/refs/heads/main/xfce4-tux-wetter-0.2.zip)
 herunter. Wechsle im Dateimanager in den Ordner mit der ZIP-Datei, klicke
 sie mit der rechten Maustaste an und wähle **Hier entpacken**. Öffne
-anschließend den entpackten Ordner `xfce4-tux-wetter-0.1` und dort ein Terminal.
+anschließend den entpackten Ordner `xfce4-tux-wetter-0.2` und dort ein Terminal.
 
 Wenn du das Repository bereits geklont hast, kannst du stattdessen direkt
 in dessen Ordner ein Terminal öffnen und mit Schritt 3 fortfahren.
@@ -61,6 +61,22 @@ das XFCE-Panel neu. Deine persönlichen Einstellungen werden dabei nicht
 
 Rechtsklick auf ein XFCE-Panel → **Panel → Neue Elemente hinzufügen** →
 **TuX-Wetter** → **Hinzufügen**. Danach erscheint das Wetter-Widget im Panel.
+
+## Bedienung
+
+- **‹ ›** neben dem Ortsnamen schalten durch die gespeicherten Orte.
+- **⚙** öffnet die Einstellungen (alternativ Rechtsklick auf das Widget →
+  *Eigenschaften*).
+
+## Updates
+
+Das Plugin prüft höchstens einmal täglich über die öffentliche GitHub-API
+(ohne Anmeldung), ob es eine neuere Version gibt. Ist das der Fall, erscheint
+ein Fenster mit **Updaten** / **Abbrechen**. *Updaten* öffnet ein Terminal und
+führt `update-user.sh` aus: Es lädt die neue Version von GitHub, baut sie,
+installiert sie und lädt das Panel neu (benötigt `curl`, `tar` und `make`).
+Manuell geht das mit `./update-user.sh` im entpackten Ordner. Die Prüfung lässt
+sich in den Einstellungen abschalten oder per Button sofort starten.
 
 ## Einstellungen und Fehlerhilfe
 

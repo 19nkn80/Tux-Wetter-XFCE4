@@ -1,4 +1,4 @@
-# TuX-Wetter 0.1 for Xfce 4
+# TuX-Wetter 0.2 for Xfce 4
 
 Native Xfce panel-plugin port of TuX-Wetter. It uses Open-Meteo without an
 account or API key; there are no paid or key-based provider options.
@@ -8,7 +8,7 @@ The presentation follows the ideas in the
 ## Build and install
 
 Dependencies: Xfce Panel 4, GTK 3, libsoup 3, JSON-GLib, a C compiler and
-`pkg-config`. Distribution-specific commands are in [QUICKINSTALL.md](QUICKINSTALL.md).
+`pkg-config`. Distribution-specific commands are in [README.md](README.md).
 `notify-send` is optional and is needed only for desktop warning notifications.
 
 ```sh
@@ -45,6 +45,12 @@ imported from an INI backup. Data is stored separately from the plugin in
 with the previous file kept as `settings.ini.bak`; a damaged primary file is
 restored from that backup on startup. Updating or reinstalling the plugin does
 not overwrite either settings file.
+
+The arrows beside the place name cycle through saved places and the gear opens
+the preferences. The plugin checks the public GitHub API at most once a day
+for a newer version (no login, can be disabled in preferences) and offers an
+Update/Cancel dialog; Update runs `update-user.sh` in a terminal, which
+downloads, builds and installs the new version and reloads the panel.
 
 This is a native GTK/Xfce UI, not a way to load the Plasma `.plasmoid` in Xfce.
 Some Plasma behavior is still not ported: MET Norway and DWD do not yet provide

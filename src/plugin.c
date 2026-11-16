@@ -16,10 +16,13 @@
 #include <string.h>
 
 #define APP_NAME "TuX-Wetter"
-#define APP_VERSION "0.1"
+#define APP_VERSION "0.2"
 #define APP_USER_AGENT "TuX-Wetter-Xfce/" APP_VERSION
 #define UPDATE_DEFAULT 15
 #define PLACES_KEY "places"
+#define RELEASES_PAGE "https://github.com/19nkn80/Tux-Wetter-XFCE4/releases"
+#define TAGS_URL "https://api.github.com/repos/19nkn80/Tux-Wetter-XFCE4/tags"
+#define UPDATE_INTERVAL_SECONDS (24 * 60 * 60)
 
 typedef struct
 {
@@ -50,6 +53,17 @@ typedef struct
     GtkWidget *source;
     GtkWidget *status;
     GtkWidget *extras;
+    GtkWidget *update_link;
+    GtkWidget *prev_button;
+    GtkWidget *next_button;
+    GtkWidget *settings_button;
+    GtkWidget *update_status;
+    gchar *update_version;
+    gchar *update_tag;
+    gchar *notified_tag;
+    GtkWidget *update_dialog;
+    gboolean update_check_enabled;
+    gint64 last_update_check;
     SoupSession *session;
     GKeyFile *settings;
     gchar *settings_path;
@@ -223,6 +237,7 @@ load_settings(WeatherApplet *applet)
     applet->warnings_enabled = TRUE;
     applet->notifications_enabled = TRUE;
     applet->notification_level = 2;
+    applet->update_check_enabled = TRUE;
     applet->settings_path = g_build_filename(g_get_user_config_dir(),
                                              "tux-wetter-xfce",
                                              "settings.ini", NULL);
@@ -310,6 +325,11 @@ load_settings(WeatherApplet *applet)
         if (g_key_file_has_key(applet->settings, "alerts", "notifications", NULL))
             applet->notifications_enabled = g_key_file_get_boolean(
                 applet->settings, "alerts", "notifications", NULL);
+        if (g_key_file_has_key(applet->settings, "updates", "enabled", NULL))
+            applet->update_check_enabled = g_key_file_get_boolean(
+                applet->settings, "updates", "enabled", NULL);
+        applet->last_update_check = g_key_file_get_int64(
+            applet->settings, "updates", "last-check", NULL);
         if (g_key_file_has_key(applet->settings, "alerts", "minimum-level", NULL))
             applet->notification_level = (guint) g_key_file_get_integer(
                 applet->settings, "alerts", "minimum-level", NULL);
@@ -418,6 +438,10 @@ save_settings(WeatherApplet *applet)
                            applet->warnings_enabled);
     g_key_file_set_boolean(applet->settings, "alerts", "notifications",
                            applet->notifications_enabled);
+    g_key_file_set_boolean(applet->settings, "updates", "enabled",
+                           applet->update_check_enabled);
+    g_key_file_set_int64(applet->settings, "updates", "last-check",
+                         applet->last_update_check);
     g_key_file_set_integer(applet->settings, "alerts", "minimum-level",
                            (gint) applet->notification_level);
     if (applet->auto_place)
@@ -2048,7 +2072,7 @@ apply_theme(WeatherApplet *applet)
         " border-radius: 20px; color: #ffffff; padding: 18px; }"
         "menu#tux-wetter-popup > menuitem { padding: 0; margin: 0; background: none; border: 0; }"
         "menu#tux-wetter-popup label { color: #ffffff; }"
-        "menu#tux-wetter-popup .weather-title { font-size: 15pt; font-weight: 600; }"
+        "menu#tux-wetter-popup .weather-title, menu#tux-wetter-popup button.weather-title label { font-size: 24pt; font-weight: 600; }"
         "menu#tux-wetter-popup .weather-temperature { font-size: 34pt; font-weight: 300; }"
         "menu#tux-wetter-popup .weather-value { font-weight: 600; }"
         "menu#tux-wetter-popup .weather-small { opacity: 0.82; font-size: 9pt; }"
@@ -2394,6 +2418,379 @@ change_place(GtkButton *button,
     fetch_weather(applet);
 }
 
+static gint
+compare_versions(const gchar *a,
+                 const gchar *b)
+{
+    if (*a == 'v' || *a == 'V')
+        a++;
+    if (*b == 'v' || *b == 'V')
+        b++;
+    while (*a || *b)
+    {
+        gchar *end_a;
+        gchar *end_b;
+        guint64 na = g_ascii_strtoull(a, &end_a, 10);
+        guint64 nb = g_ascii_strtoull(b, &end_b, 10);
+
+        if (na != nb)
+            return na > nb ? 1 : -1;
+        if (end_a == a && end_b == b)
+            break;
+        a = *end_a == '.' ? end_a + 1 : end_a;
+        b = *end_b == '.' ? end_b + 1 : end_b;
+    }
+    return 0;
+}
+
+static void show_update_dialog(WeatherApplet *applet);
+
+static void
+open_release_page(WeatherApplet *applet)
+{
+    GError *error = NULL;
+
+    gtk_menu_popdown(GTK_MENU(applet->popover));
+    if (!g_app_info_launch_default_for_uri(RELEASES_PAGE, NULL, &error))
+    {
+        g_warning("%s: cannot open release page: %s", APP_NAME, error->message);
+        g_clear_error(&error);
+    }
+}
+
+static void
+start_update(WeatherApplet *applet)
+{
+    static const gchar script[] =
+        "curl -fsSL \"https://raw.githubusercontent.com/19nkn80/Tux-Wetter-XFCE4/$1/update-user.sh\" | sh -s -- \"$1\"; "
+        "printf '\\nZum Schließen Enter drücken …'; read -r _";
+    const gchar *terminals[] = { "xfce4-terminal", "x-terminal-emulator", "xterm" };
+    guint i;
+
+    gtk_menu_popdown(GTK_MENU(applet->popover));
+    if (!applet->update_tag || !*applet->update_tag ||
+        strspn(applet->update_tag,
+               "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
+            != strlen(applet->update_tag))
+    {
+        open_release_page(applet);
+        return;
+    }
+    for (i = 0; i < G_N_ELEMENTS(terminals); i++)
+    {
+        gchar *path = g_find_program_in_path(terminals[i]);
+        gchar *argv[] = { "setsid", path, i == 0 ? "-x" : "-e", "sh", "-c",
+                          (gchar *) script, "sh", applet->update_tag, NULL };
+        gboolean started;
+
+        if (!path)
+            continue;
+        started = g_spawn_async(NULL, argv, NULL, G_SPAWN_SEARCH_PATH,
+                                NULL, NULL, NULL, NULL);
+        g_free(path);
+        if (started)
+            return;
+    }
+    open_release_page(applet);
+}
+
+static void
+update_dialog_response(GtkDialog *dialog,
+                       gint response,
+                       gpointer user_data)
+{
+    WeatherApplet *applet = user_data;
+
+    applet->update_dialog = NULL;
+    gtk_widget_destroy(GTK_WIDGET(dialog));
+    if (response == GTK_RESPONSE_ACCEPT)
+        start_update(applet);
+}
+
+static void
+show_update_dialog(WeatherApplet *applet)
+{
+    gboolean english = use_english(applet);
+    GtkWidget *dialog;
+
+    if (!applet->update_version)
+        return;
+    gtk_menu_popdown(GTK_MENU(applet->popover));
+    if (applet->update_dialog)
+    {
+        gtk_window_present(GTK_WINDOW(applet->update_dialog));
+        return;
+    }
+    dialog = gtk_message_dialog_new(NULL, 0, GTK_MESSAGE_QUESTION,
+                                    GTK_BUTTONS_NONE, "%s",
+                                    english ? "Update available" :
+                                    "Update verfügbar");
+    gtk_message_dialog_format_secondary_text(
+        GTK_MESSAGE_DIALOG(dialog),
+        english ? "TuX-Wetter %s is available (installed: %s). Update now?" :
+        "TuX-Wetter %s ist verfügbar (installiert: %s). Jetzt updaten?",
+        applet->update_version, APP_VERSION);
+    gtk_dialog_add_button(GTK_DIALOG(dialog), english ? "Cancel" : "Abbrechen",
+                          GTK_RESPONSE_CANCEL);
+    gtk_dialog_add_button(GTK_DIALOG(dialog), english ? "Update" : "Updaten",
+                          GTK_RESPONSE_ACCEPT);
+    gtk_window_set_keep_above(GTK_WINDOW(dialog), TRUE);
+    applet->update_dialog = dialog;
+    g_signal_connect(dialog, "response", G_CALLBACK(update_dialog_response), applet);
+    gtk_widget_show_all(dialog);
+}
+
+static void
+set_update_result(WeatherApplet *applet,
+                  const gchar *latest,
+                  const gchar *error_text,
+                  gboolean manual)
+{
+    gchar *text = NULL;
+    gboolean english = use_english(applet);
+
+    g_clear_pointer(&applet->update_version, g_free);
+    g_clear_pointer(&applet->update_tag, g_free);
+    if (latest && compare_versions(latest, APP_VERSION) > 0)
+    {
+        const gchar *clean = (latest[0] == 'v' || latest[0] == 'V') ? latest + 1 : latest;
+        applet->update_version = g_strdup(clean);
+        applet->update_tag = g_strdup(latest);
+        text = g_strdup_printf(english ? "Update available: %s (installed: %s)" :
+                               "Update verfügbar: %s (installiert: %s)",
+                               clean, APP_VERSION);
+        gtk_button_set_label(GTK_BUTTON(applet->update_link), text);
+        gtk_widget_show(applet->update_link);
+        g_free(text);
+        text = g_strdup_printf(english ? "Update available: %s" :
+                               "Update verfügbar: %s", clean);
+        if (g_strcmp0(applet->notified_tag, latest) != 0)
+        {
+            g_free(applet->notified_tag);
+            applet->notified_tag = g_strdup(latest);
+            show_update_dialog(applet);
+        }
+    }
+    else
+    {
+        gtk_widget_hide(applet->update_link);
+        text = g_strdup(error_text ? error_text :
+                        (english ? "You are using the latest version." :
+                         "Du verwendest die aktuelle Version."));
+    }
+    if (manual && applet->update_status)
+        gtk_label_set_text(GTK_LABEL(applet->update_status), text);
+    g_free(text);
+}
+
+typedef struct
+{
+    XfcePanelPlugin *plugin;
+    SoupMessage *message;
+    gboolean manual;
+} UpdateRequest;
+
+static gchar *
+newest_tag(GBytes *bytes)
+{
+    JsonParser *parser = json_parser_new();
+    gsize length;
+    const gchar *body = g_bytes_get_data(bytes, &length);
+    gchar *latest = NULL;
+
+    if (json_parser_load_from_data(parser, body, (gssize) length, NULL))
+    {
+        JsonNode *root = json_parser_get_root(parser);
+        if (root && JSON_NODE_HOLDS_ARRAY(root))
+        {
+            JsonArray *array = json_node_get_array(root);
+            guint i;
+            for (i = 0; i < json_array_get_length(array); i++)
+            {
+                JsonObject *tag = json_array_get_object_element(array, i);
+                const gchar *name = tag && json_object_has_member(tag, "name") ?
+                    json_object_get_string_member(tag, "name") : NULL;
+                if (name && (!latest || compare_versions(name, latest) > 0))
+                {
+                    g_free(latest);
+                    latest = g_strdup(name);
+                }
+            }
+        }
+    }
+    g_object_unref(parser);
+    return latest;
+}
+
+static void
+update_loaded(GObject *source,
+              GAsyncResult *result,
+              gpointer user_data)
+{
+    UpdateRequest *request = user_data;
+    WeatherApplet *applet = get_applet(request->plugin);
+    GError *error = NULL;
+    GBytes *bytes = soup_session_send_and_read_finish(SOUP_SESSION(source),
+                                                       result, &error);
+
+    if (applet)
+    {
+        gchar *latest = NULL;
+        const gchar *failure = NULL;
+        gboolean english = use_english(applet);
+
+        if (!bytes || soup_message_get_status(request->message) >= 400)
+            failure = english ? "Update check failed." :
+                "Update-Prüfung fehlgeschlagen.";
+        else
+        {
+            latest = newest_tag(bytes);
+            if (!latest)
+                failure = english ? "No published version found." :
+                    "Keine veröffentlichte Version gefunden.";
+        }
+        if (!failure)
+        {
+            applet->last_update_check = g_get_real_time() / G_USEC_PER_SEC;
+            save_settings(applet);
+        }
+        set_update_result(applet, latest, failure, request->manual);
+        g_free(latest);
+    }
+    if (bytes)
+        g_bytes_unref(bytes);
+    g_clear_error(&error);
+    g_object_unref(request->message);
+    g_object_unref(request->plugin);
+    g_free(request);
+}
+
+static void
+check_for_updates(WeatherApplet *applet,
+                  gboolean manual)
+{
+    SoupMessage *message;
+    UpdateRequest *request;
+    SoupMessageHeaders *headers;
+
+    if (!manual)
+    {
+        gint64 now = g_get_real_time() / G_USEC_PER_SEC;
+        if (!applet->update_check_enabled ||
+            now - applet->last_update_check < UPDATE_INTERVAL_SECONDS)
+            return;
+    }
+    message = soup_message_new("GET", TAGS_URL);
+    if (!message)
+        return;
+    headers = soup_message_get_request_headers(message);
+    soup_message_headers_append(headers, "User-Agent", APP_USER_AGENT);
+    soup_message_headers_append(headers, "Accept", "application/vnd.github+json");
+    request = g_new0(UpdateRequest, 1);
+    request->plugin = g_object_ref(applet->plugin);
+    request->message = g_object_ref(message);
+    request->manual = manual;
+    soup_session_send_and_read_async(applet->session, message,
+                                     G_PRIORITY_DEFAULT, NULL,
+                                     update_loaded, request);
+    g_object_unref(message);
+}
+
+static void header_button_action(GtkWidget *button, WeatherApplet *applet);
+
+static gboolean
+pointer_over_widget(GtkWidget *widget,
+                    GdkEventButton *event)
+{
+    GdkWindow *window = gtk_widget_get_window(widget);
+    GtkAllocation allocation;
+    gint x;
+    gint y;
+
+    if (!window || !gtk_widget_get_mapped(widget))
+        return FALSE;
+    gdk_window_get_origin(window, &x, &y);
+    gtk_widget_get_allocation(widget, &allocation);
+    if (!gtk_widget_get_has_window(widget))
+    {
+        x += allocation.x;
+        y += allocation.y;
+    }
+    return event->x_root >= x && event->x_root < x + allocation.width &&
+        event->y_root >= y && event->y_root < y + allocation.height;
+}
+
+/* A GtkMenu swallows clicks on child widgets, so hit-test the buttons here. */
+static gboolean
+menu_button_event(GtkWidget *menu,
+                  GdkEventButton *event,
+                  gpointer user_data)
+{
+    WeatherApplet *applet = user_data;
+    GtkWidget *buttons[] = { applet->prev_button, applet->next_button,
+                             applet->settings_button, applet->update_link };
+    guint i;
+    (void) menu;
+
+    for (i = 0; i < G_N_ELEMENTS(buttons); i++)
+    {
+        if (!buttons[i] || !gtk_widget_get_visible(buttons[i]) ||
+            !pointer_over_widget(buttons[i], event))
+            continue;
+        if (event->button == 1 && event->type == GDK_BUTTON_RELEASE)
+            header_button_action(buttons[i], applet);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static void
+header_button_action(GtkWidget *button,
+                     WeatherApplet *applet)
+{
+    gint action = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "action"));
+
+    if (action == 0)
+    {
+        gtk_menu_popdown(GTK_MENU(applet->popover));
+        show_preferences(applet);
+    }
+    else if (action == 2)
+        show_update_dialog(applet);
+    else
+        change_place(GTK_BUTTON(button), applet);
+}
+
+static void
+update_check_now_clicked(GtkButton *button,
+                         gpointer user_data)
+{
+    WeatherApplet *applet = user_data;
+    (void) button;
+    if (applet->update_status)
+        gtk_label_set_text(GTK_LABEL(applet->update_status),
+                           use_english(applet) ? "Checking …" : "Prüfe …");
+    check_for_updates(applet, TRUE);
+}
+
+static void
+update_enabled_toggled(GtkToggleButton *toggle,
+                       gpointer user_data)
+{
+    WeatherApplet *applet = user_data;
+    applet->update_check_enabled = gtk_toggle_button_get_active(toggle);
+    save_settings(applet);
+}
+
+static void
+update_status_destroyed(GtkWidget *widget,
+                        gpointer user_data)
+{
+    WeatherApplet *applet = user_data;
+    (void) widget;
+    applet->update_status = NULL;
+}
+
 static gboolean
 panel_size_changed(XfcePanelPlugin *plugin,
                   gint size,
@@ -2430,10 +2827,12 @@ build_popover(WeatherApplet *applet)
     GtkWidget *icon_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     GtkWidget *hours_scroller;
     GtkWidget *scroller;
-    GtkWidget *settings_icon;
     GtkWidget *menu = gtk_menu_new();
     GtkWidget *item = gtk_menu_item_new();
 
+    applet->update_link = gtk_button_new();
+    gtk_button_set_relief(GTK_BUTTON(applet->update_link), GTK_RELIEF_NONE);
+    gtk_widget_set_halign(applet->update_link, GTK_ALIGN_CENTER);
     applet->popover = menu;
     gtk_widget_set_name(menu, "tux-wetter-popup");
     gtk_menu_set_reserve_toggle_size(GTK_MENU(menu), FALSE);
@@ -2444,16 +2843,25 @@ build_popover(WeatherApplet *applet)
 
     g_object_set_data(G_OBJECT(previous), "direction", GINT_TO_POINTER(-1));
     g_object_set_data(G_OBJECT(next), "direction", GINT_TO_POINTER(1));
-    g_signal_connect(previous, "clicked", G_CALLBACK(change_place), applet);
-    g_signal_connect(next, "clicked", G_CALLBACK(change_place), applet);
-    settings_icon = gtk_image_new_from_icon_name("preferences-system",
-                                                 GTK_ICON_SIZE_MENU);
-    gtk_button_set_image(GTK_BUTTON(settings), settings_icon);
+    g_object_set_data(G_OBJECT(previous), "action", GINT_TO_POINTER(1));
+    g_object_set_data(G_OBJECT(next), "action", GINT_TO_POINTER(1));
+    g_object_set_data(G_OBJECT(settings), "action", GINT_TO_POINTER(0));
+    gtk_style_context_add_class(gtk_widget_get_style_context(previous), "weather-title");
+    gtk_style_context_add_class(gtk_widget_get_style_context(next), "weather-title");
+    gtk_style_context_add_class(gtk_widget_get_style_context(settings), "weather-title");
+    g_object_set_data(G_OBJECT(applet->update_link), "action", GINT_TO_POINTER(2));
+    {
+        applet->prev_button = previous;
+        applet->next_button = next;
+        applet->settings_button = settings;
+        g_signal_connect(menu, "button-press-event",
+                         G_CALLBACK(menu_button_event), applet);
+        g_signal_connect(menu, "button-release-event",
+                         G_CALLBACK(menu_button_event), applet);
+    }
     gtk_button_set_relief(GTK_BUTTON(previous), GTK_RELIEF_NONE);
     gtk_button_set_relief(GTK_BUTTON(next), GTK_RELIEF_NONE);
     gtk_button_set_relief(GTK_BUTTON(settings), GTK_RELIEF_NONE);
-    g_signal_connect_swapped(settings, "clicked",
-                             G_CALLBACK(show_preferences), applet);
 
     applet->place_name = make_label(english ? "Loading location …" : "Lade Ort …",
                                     "weather-title");
@@ -2494,6 +2902,8 @@ build_popover(WeatherApplet *applet)
     gtk_label_set_line_wrap(GTK_LABEL(applet->status), TRUE);
     gtk_widget_set_halign(applet->status, GTK_ALIGN_CENTER);
     gtk_box_pack_start(GTK_BOX(outer), applet->status, FALSE, FALSE, 0);
+
+    gtk_box_pack_start(GTK_BOX(outer), applet->update_link, FALSE, FALSE, 0);
 
     add_separator(outer);
     applet->hours_title = make_label(english ? "Next hours" : "Nächste Stunden",
@@ -3361,6 +3771,25 @@ show_preferences(WeatherApplet *applet)
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(animations),
                                  applet->animations);
     gtk_grid_attach(GTK_GRID(grid), animations, 0, 27, 3, 1);
+    {
+        GtkWidget *updates = gtk_check_button_new_with_label(
+            "Täglich auf neue Version prüfen (GitHub)");
+        GtkWidget *check_now = gtk_button_new_with_label("Jetzt prüfen");
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(updates),
+                                     applet->update_check_enabled);
+        gtk_grid_attach(GTK_GRID(grid), updates, 0, 28, 2, 1);
+        gtk_grid_attach(GTK_GRID(grid), check_now, 2, 28, 1, 1);
+        applet->update_status = make_label(applet->update_version ?
+            "Update verfügbar" : "", "weather-small");
+        gtk_widget_set_halign(applet->update_status, GTK_ALIGN_START);
+        gtk_grid_attach(GTK_GRID(grid), applet->update_status, 0, 29, 3, 1);
+        g_signal_connect(updates, "toggled",
+                         G_CALLBACK(update_enabled_toggled), applet);
+        g_signal_connect(check_now, "clicked",
+                         G_CALLBACK(update_check_now_clicked), applet);
+        g_signal_connect(applet->update_status, "destroy",
+                         G_CALLBACK(update_status_destroyed), applet);
+    }
 
     gtk_widget_set_halign(status, GTK_ALIGN_START);
     g_object_set_data(G_OBJECT(dialog), "unit", unit);
@@ -3476,6 +3905,9 @@ applet_free(gpointer data)
     g_free(applet->language);
     g_free(applet->official_warning);
     g_free(applet->last_notification);
+    g_free(applet->update_version);
+    g_free(applet->update_tag);
+    g_free(applet->notified_tag);
     g_free(applet);
 }
 
@@ -3521,6 +3953,7 @@ construct_plugin(XfcePanelPlugin *plugin)
     gtk_widget_hide(applet->warning);
     gtk_widget_hide(applet->status);
     gtk_widget_show_all(applet->popover);
+    gtk_widget_hide(applet->update_link);
     apply_display_options(applet);
 
     applet->refresh_source = g_timeout_add_seconds(
@@ -3528,6 +3961,7 @@ construct_plugin(XfcePanelPlugin *plugin)
     fetch_weather(applet);
     if (applet->auto_location)
         fetch_auto_location(applet);
+    check_for_updates(applet, FALSE);
 }
 
 XFCE_PANEL_PLUGIN_REGISTER(construct_plugin)
