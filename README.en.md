@@ -1,6 +1,8 @@
 # TuX-Wetter 0.2 for Xfce 4
 
-Native Xfce panel-plugin port of TuX-Wetter. It uses Open-Meteo without an
+Native Xfce panel-plugin port of TuX-Wetter, a fork of the
+"Tux-Wetter-1-5" KDE Plasma widget by Mastertac. *About* (panel menu or
+preferences) shows the version. It uses Open-Meteo without an
 account or API key; there are no paid or key-based provider options.
 The presentation follows the ideas in the
 [TuX-Wetter forum thread](https://forum.linuxguides.de/index.php?thread/17421-tux-wetter-v1-3-neue-version-25-10-26/).

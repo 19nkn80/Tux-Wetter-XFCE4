@@ -146,6 +146,7 @@ typedef struct
 static void fetch_weather(WeatherApplet *applet);
 static void update_display(WeatherApplet *applet);
 static void show_preferences(WeatherApplet *applet);
+static void about_clicked(GtkButton *button, gpointer user_data);
 static void save_settings(WeatherApplet *applet);
 static gboolean refresh_timeout(gpointer user_data);
 static void fetch_provider_current(WeatherApplet *applet);
@@ -2812,6 +2813,20 @@ add_separator(GtkWidget *box)
     gtk_box_pack_start(GTK_BOX(box), separator, FALSE, FALSE, 1);
 }
 
+static void
+set_label_points(GtkWidget *label,
+                 gint points)
+{
+    PangoAttrList *attributes = pango_attr_list_new();
+
+    pango_attr_list_insert(attributes,
+                           pango_attr_size_new(points * PANGO_SCALE));
+    pango_attr_list_insert(attributes,
+                           pango_attr_weight_new(PANGO_WEIGHT_SEMIBOLD));
+    gtk_label_set_attributes(GTK_LABEL(label), attributes);
+    pango_attr_list_unref(attributes);
+}
+
 static GtkWidget *
 build_popover(WeatherApplet *applet)
 {
@@ -2849,6 +2864,16 @@ build_popover(WeatherApplet *applet)
     gtk_style_context_add_class(gtk_widget_get_style_context(previous), "weather-title");
     gtk_style_context_add_class(gtk_widget_get_style_context(next), "weather-title");
     gtk_style_context_add_class(gtk_widget_get_style_context(settings), "weather-title");
+    {
+        GtkWidget *large[] = { previous, next, settings };
+        guint i;
+        for (i = 0; i < G_N_ELEMENTS(large); i++)
+        {
+            GtkWidget *child = gtk_bin_get_child(GTK_BIN(large[i]));
+            if (GTK_IS_LABEL(child))
+                set_label_points(child, 24);
+        }
+    }
     g_object_set_data(G_OBJECT(applet->update_link), "action", GINT_TO_POINTER(2));
     {
         applet->prev_button = previous;
@@ -2867,6 +2892,7 @@ build_popover(WeatherApplet *applet)
                                     "weather-title");
     gtk_widget_set_hexpand(applet->place_name, TRUE);
     gtk_label_set_ellipsize(GTK_LABEL(applet->place_name), PANGO_ELLIPSIZE_END);
+    set_label_points(applet->place_name, 24);
     gtk_label_set_max_width_chars(GTK_LABEL(applet->place_name), 28);
     gtk_box_pack_start(GTK_BOX(header), previous, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(header), applet->place_name, TRUE, TRUE, 0);
@@ -3783,6 +3809,12 @@ show_preferences(WeatherApplet *applet)
             "Update verfügbar" : "", "weather-small");
         gtk_widget_set_halign(applet->update_status, GTK_ALIGN_START);
         gtk_grid_attach(GTK_GRID(grid), applet->update_status, 0, 29, 3, 1);
+        {
+            GtkWidget *about = gtk_button_new_with_label(
+                "Über TuX-Wetter (Version " APP_VERSION ")");
+            gtk_grid_attach(GTK_GRID(grid), about, 0, 30, 3, 1);
+            g_signal_connect(about, "clicked", G_CALLBACK(about_clicked), applet);
+        }
         g_signal_connect(updates, "toggled",
                          G_CALLBACK(update_enabled_toggled), applet);
         g_signal_connect(check_now, "clicked",
@@ -3875,6 +3907,50 @@ configure_plugin(XfcePanelPlugin *plugin,
 }
 
 static void
+show_about(WeatherApplet *applet)
+{
+    gboolean english = use_english(applet);
+    const gchar *authors[] = { "19nkn80 (Xfce 4 port)",
+                               "Mastertac (original TuX-Wetter 1.5, KDE Plasma)",
+                               NULL };
+    gchar *comments = g_strdup(english ?
+        "Weather widget for the Xfce 4 panel.\n\n"
+        "This is a fork of the \"Tux-Wetter-1-5\" KDE Plasma widget by Mastertac." :
+        "Wetter-Widget für das Xfce-4-Panel.\n\n"
+        "Dies ist ein Fork des KDE-Plasma-Widgets \"Tux-Wetter-1-5\" "
+        "vom Benutzer Mastertac.");
+
+    gtk_menu_popdown(GTK_MENU(applet->popover));
+    gtk_show_about_dialog(NULL,
+                          "program-name", "TuX-Wetter",
+                          "version", APP_VERSION,
+                          "comments", comments,
+                          "website", "https://github.com/19nkn80/Tux-Wetter-XFCE4",
+                          "website-label", "github.com/19nkn80/Tux-Wetter-XFCE4",
+                          "authors", authors,
+                          "license-type", GTK_LICENSE_GPL_3_0,
+                          "logo-icon-name", "weather-few-clouds",
+                          NULL);
+    g_free(comments);
+}
+
+static void
+about_plugin(XfcePanelPlugin *plugin,
+             gpointer user_data)
+{
+    (void) plugin;
+    show_about(user_data);
+}
+
+static void
+about_clicked(GtkButton *button,
+              gpointer user_data)
+{
+    (void) button;
+    show_about(user_data);
+}
+
+static void
 orientation_changed(XfcePanelPlugin *plugin,
                    GtkOrientation orientation,
                    gpointer user_data)
@@ -3936,6 +4012,8 @@ construct_plugin(XfcePanelPlugin *plugin)
     g_signal_connect(plugin, "configure-plugin",
                      G_CALLBACK(configure_plugin), applet);
     xfce_panel_plugin_menu_show_configure(plugin);
+    g_signal_connect(plugin, "about", G_CALLBACK(about_plugin), applet);
+    xfce_panel_plugin_menu_show_about(plugin);
     g_signal_connect(plugin, "orientation-changed",
                      G_CALLBACK(orientation_changed), applet);
     g_signal_connect(plugin, "size-changed",

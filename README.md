@@ -4,6 +4,10 @@ Diese Anleitung installiert das Plugin für den aktuellen Benutzer. Das Wetter
 wird über kostenlose, öffentliche Dienste geladen; ein API-Schlüssel ist nicht
 erforderlich. Eine Internetverbindung wird benötigt.
 
+> TuX-Wetter XFCE ist ein Fork des KDE-Plasma-Widgets **Tux-Wetter-1-5** vom
+> Benutzer **Mastertac**. Version und Hinweise zeigt „Über TuX-Wetter“
+> (Rechtsklick aufs Widget → *Info* oder Button in den Einstellungen).
+
 ## 1. Abhängigkeiten installieren
 
 Öffne ein Terminal und führe **nur den Befehl für deine Distribution** aus.
