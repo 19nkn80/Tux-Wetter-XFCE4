@@ -1,4 +1,5 @@
 /src/*.o
 /libxfce4-tux-wetter.so
 /test-weather
+/test-provider
 /*.tar.gz

@@ -22,8 +22,12 @@ test-weather: tests/test-weather.c src/weather.c src/weather.h
 	$(CC) $(CFLAGS) -o $@ tests/test-weather.c src/weather.c \
 		$(shell $(PKG_CONFIG) --cflags --libs json-glib-1.0) -lm
 
-test: test-weather
+test-provider: tests/test-provider.c src/plugin.c src/weather.c src/weather.h
+	$(CC) $(CFLAGS) -o $@ tests/test-provider.c src/weather.c $(LDLIBS)
+
+test: test-weather test-provider
 	./test-weather
+	./test-provider
 
 src/%.o: src/%.c src/weather.h
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -33,6 +37,6 @@ install: lib$(NAME).so
 	install -Dm644 $(NAME).desktop "$(DESTDIR)$(PREFIX)/share/xfce4/panel/plugins/$(NAME).desktop"
 
 clean:
-	rm -f $(OBJECTS) lib$(NAME).so test-weather
+	rm -f $(OBJECTS) lib$(NAME).so test-weather test-provider
 
 .PHONY: all install clean test

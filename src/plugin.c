@@ -16,7 +16,7 @@
 #include <string.h>
 
 #define APP_NAME "TuX-Wetter"
-#define APP_VERSION "0.2"
+#define APP_VERSION "0.3"
 #define APP_USER_AGENT "TuX-Wetter-Xfce/" APP_VERSION
 #define UPDATE_DEFAULT 15
 #define PLACES_KEY "places"
@@ -389,6 +389,16 @@ load_settings(WeatherApplet *applet)
     {
         g_free(applet->theme);
         applet->theme = g_strdup("violett");
+    }
+    if (g_strcmp0(applet->provider, "Open-Meteo") == 0 ||
+        g_strcmp0(applet->provider, "MET Norway (yr.no)") == 0 ||
+        g_strcmp0(applet->provider, "DWD über Bright Sky") == 0)
+    {
+        const gchar *id = g_strcmp0(applet->provider, "Open-Meteo") == 0 ?
+            "openmeteo" : g_strcmp0(applet->provider, "MET Norway (yr.no)") == 0 ?
+            "metno" : "dwd";
+        g_free(applet->provider);
+        applet->provider = g_strdup(id);
     }
     if (!applet->provider ||
         (g_strcmp0(applet->provider, "openmeteo") != 0 &&
@@ -2179,6 +2189,36 @@ weather_loaded(GObject *source,
     g_free(request);
 }
 
+static gboolean
+set_provider_from_combo(WeatherApplet *applet,
+                        GtkComboBox *combo)
+{
+    const gchar *id = gtk_combo_box_get_active_id(combo);
+    gboolean changed = id && g_strcmp0(id, applet->provider) != 0;
+
+    if (changed)
+    {
+        g_free(applet->provider);
+        applet->provider = g_strdup(id);
+    }
+    return changed;
+}
+
+static GtkWidget *
+provider_combo_new(const gchar *selected)
+{
+    GtkWidget *provider = gtk_combo_box_text_new();
+
+    gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(provider), "openmeteo",
+                              "Open-Meteo");
+    gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(provider), "metno",
+                              "MET Norway (yr.no)");
+    gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(provider), "dwd",
+                              "DWD über Bright Sky");
+    gtk_combo_box_set_active_id(GTK_COMBO_BOX(provider), selected);
+    return provider;
+}
+
 static void
 preferences_changed(GtkWidget *widget,
                    gpointer user_data)
@@ -2205,7 +2245,6 @@ preferences_changed(GtkWidget *widget,
     GtkWidget *notify_level = g_object_get_data(G_OBJECT(dialog), "notify-level");
     GtkWidget *language = g_object_get_data(G_OBJECT(dialog), "language");
     GtkWidget *animations = g_object_get_data(G_OBJECT(dialog), "animations");
-    gchar *selected_provider;
     gchar *selected_theme;
     gint selected_place;
     gboolean place_changed;
@@ -2261,15 +2300,7 @@ preferences_changed(GtkWidget *widget,
         g_free(applet->language);
         applet->language = selected_language;
     }
-    selected_provider = gtk_combo_box_text_get_active_text(
-        GTK_COMBO_BOX_TEXT(provider));
-    provider_changed = selected_provider &&
-        g_strcmp0(selected_provider, applet->provider) != 0;
-    if (selected_provider)
-    {
-        g_free(applet->provider);
-        applet->provider = selected_provider;
-    }
+    provider_changed = set_provider_from_combo(applet, GTK_COMBO_BOX(provider));
     selected_place = gtk_combo_box_get_active(GTK_COMBO_BOX(saved_places));
     place_changed = selected_place >= 0 &&
         (guint) selected_place < applet->places->len &&
@@ -3510,7 +3541,6 @@ preferences_response(GtkDialog *dialog,
     if (response != GTK_RESPONSE_CANCEL)
     {
         gchar *selected_theme;
-        gchar *selected_provider;
         applet->fahrenheit = gtk_combo_box_get_active(GTK_COMBO_BOX(unit)) == 1;
         applet->refresh_minutes = (guint) gtk_spin_button_get_value_as_int(
             GTK_SPIN_BUTTON(refresh));
@@ -3547,13 +3577,7 @@ preferences_response(GtkDialog *dialog,
                 applet->language = selected_language;
             }
         }
-        selected_provider = gtk_combo_box_text_get_active_text(
-            GTK_COMBO_BOX_TEXT(provider));
-        if (selected_provider)
-        {
-            g_free(applet->provider);
-            applet->provider = selected_provider;
-        }
+        set_provider_from_combo(applet, GTK_COMBO_BOX(provider));
         if (gtk_combo_box_get_active(GTK_COMBO_BOX(saved_places)) >= 0)
             applet->place_index = (guint) gtk_combo_box_get_active(
                 GTK_COMBO_BOX(saved_places));
@@ -3731,14 +3755,7 @@ show_preferences(WeatherApplet *applet)
     gtk_grid_attach(GTK_GRID(grid), forecast, 0, 14, 3, 1);
     label = make_label("Wetteranbieter für aktuelle Messwerte", NULL);
     gtk_grid_attach(GTK_GRID(grid), label, 0, 15, 1, 1);
-    provider = gtk_combo_box_text_new();
-    gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(provider), "openmeteo",
-                              "Open-Meteo");
-    gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(provider), "metno",
-                              "MET Norway (yr.no)");
-    gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(provider), "dwd",
-                              "DWD über Bright Sky");
-    gtk_combo_box_set_active_id(GTK_COMBO_BOX(provider), applet->provider);
+    provider = provider_combo_new(applet->provider);
     gtk_grid_attach(GTK_GRID(grid), provider, 1, 15, 2, 1);
     label = make_label("Open-Meteo liefert weiterhin Vorhersage, UV und Sonnenzeiten.", "weather-small");
     gtk_grid_attach(GTK_GRID(grid), label, 0, 16, 3, 1);

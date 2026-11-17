@@ -1,4 +1,4 @@
-# TuX-Wetter XFCE 0.2 — Schnellinstallation
+# TuX-Wetter XFCE 0.3 — Schnellinstallation
 
 Diese Anleitung installiert das Plugin für den aktuellen Benutzer. Das Wetter
 wird über kostenlose, öffentliche Dienste geladen; ein API-Schlüssel ist nicht
@@ -41,10 +41,10 @@ Für optionale Desktop-Benachrichtigungen bei Warnungen zusätzlich installieren
 
 ## 2. Paket entpacken
 
-Lade das [Installationspaket xfce4-tux-wetter-0.2.zip](https://github.com/19nkn80/Tux-Wetter-XFCE4/raw/refs/heads/main/xfce4-tux-wetter-0.2.zip)
+Lade das [Installationspaket xfce4-tux-wetter-0.3.zip](https://github.com/19nkn80/Tux-Wetter-XFCE4/raw/refs/heads/main/xfce4-tux-wetter-0.3.zip)
 herunter. Wechsle im Dateimanager in den Ordner mit der ZIP-Datei, klicke
 sie mit der rechten Maustaste an und wähle **Hier entpacken**. Öffne
-anschließend den entpackten Ordner `xfce4-tux-wetter-0.2` und dort ein Terminal.
+anschließend den entpackten Ordner `xfce4-tux-wetter-0.3` und dort ein Terminal.
 
 Wenn du das Repository bereits geklont hast, kannst du stattdessen direkt
 in dessen Ordner ein Terminal öffnen und mit Schritt 3 fortfahren.
@@ -86,6 +86,9 @@ sich in den Einstellungen abschalten oder per Button sofort starten.
 
 Die Einstellungen bleiben bei Updates erhalten und liegen unter
 `~/.config/tux-wetter-xfce/`.
+Ab Version 0.3 bleibt auch der ausgewählte Wetteranbieter nach dem Schließen
+der Einstellungen erhalten. Bereits falsch gespeicherte Anbieternamen aus
+Version 0.2 werden beim Laden übernommen, sofern sie noch vorhanden sind.
 
 Falls die Installation mit einer fehlenden Abhängigkeit abbricht, installiere
 die Pakete aus Schritt 1 für deine Distribution und führe

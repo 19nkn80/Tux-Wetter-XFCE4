@@ -1,4 +1,4 @@
-# TuX-Wetter 0.2 for Xfce 4
+# TuX-Wetter 0.3 for Xfce 4
 
 Native Xfce panel-plugin port of TuX-Wetter, a fork of the
 "Tux-Wetter-1-5" KDE Plasma widget by Mastertac. *About* (panel menu or
